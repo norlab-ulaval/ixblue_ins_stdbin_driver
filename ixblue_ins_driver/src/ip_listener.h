@@ -24,7 +24,7 @@ class IPListener : private boost::noncopyable
     IPListener() = delete;
 
 public:
-    IPListener(const std::string& ip, uint16_t port);
+    IPListener(const std::string& ip, uint16_t port, rclcpp::Node::SharedPtr nh);
     virtual ~IPListener();
 
     void onNewDataReceived(const boost::system::error_code& error,
@@ -41,6 +41,7 @@ protected:
 
     ixblue_stdbin_decoder::StdBinDecoder parser;
 
+    rclcpp::Node::SharedPtr nh;
     boost::array<uint8_t, 8192> datas;
     boost::asio::io_service service;
     std::thread asioThread;

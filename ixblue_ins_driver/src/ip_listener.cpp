@@ -1,9 +1,8 @@
 #include "ip_listener.h"
-#include <ros/console.h>
 
 using namespace boost::asio;
 
-IPListener::IPListener(const std::string& ip, uint16_t port) : ip(ip), port(port) {}
+IPListener::IPListener(const std::string& ip, uint16_t port, rclcpp::Node::SharedPtr nh) : nh(nh), ip(ip), port(port), rosPublisher(nh) {}
 
 IPListener::~IPListener()
 {
@@ -24,11 +23,11 @@ void IPListener::onNewDataReceived(const boost::system::error_code& error,
     {
         // We don't publish a diagnostics here, they will be handled in an higher level.
         // If there is an error, there is no parse, so diagnostic updater will detect it.
-        ROS_WARN_STREAM("Error occurs in IP Listener : " << error.message());
+        RCLCPP_WARN_STREAM(nh->get_logger(), "Error occurs in IP Listener : " << error.message());
     }
     else
     {
-        ROS_DEBUG_STREAM("Received StdBin data");
+        RCLCPP_DEBUG_STREAM(nh->get_logger(), "Received StdBin data");
         // No errors, we can parse it :
         try
         {
@@ -42,7 +41,7 @@ void IPListener::onNewDataReceived(const boost::system::error_code& error,
         }
         catch(const std::runtime_error& e)
         {
-            ROS_WARN_STREAM("Parse error : " << e.what());
+            RCLCPP_WARN_STREAM(nh->get_logger(), "Parse error : " << e.what());
             // TODO : Publish a diagnostic
         }
     }

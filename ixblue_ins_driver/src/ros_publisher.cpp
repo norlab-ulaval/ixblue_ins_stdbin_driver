@@ -5,14 +5,17 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include "ros_publisher.h"
-#include <ros/node_handle.h>
 
-ROSPublisher::ROSPublisher() : nh("~"), diagPub(nh)
+ROSPublisher::ROSPublisher(rclcpp::Node::SharedPtr nh) : nh(nh), diagPub(nh)
 {
-    nh.param("frame_id", frame_id, std::string("imu_link_ned"));
-    nh.param("time_source", time_source, std::string("ins"));
-    nh.param("time_origin", time_origin, std::string("unix"));
-    nh.param("use_compensated_acceleration", use_compensated_acceleration, false);
+    nh->declare_parameter<std::string>("frame_id", "imu_link_ned");
+    nh->get_parameter("frame_id", frame_id);
+    nh->declare_parameter<std::string>("time_source", "ins");
+    nh->get_parameter("time_source", time_source);
+    nh->declare_parameter<std::string>("time_origin", "unix");
+    nh->get_parameter("time_origin", time_origin);
+    nh->declare_parameter<bool>("use_compensated_acceleration", false);
+    nh->get_parameter("use_compensated_acceleration", use_compensated_acceleration);
 
     if(time_source == std::string("ros"))
     {
@@ -20,7 +23,7 @@ ROSPublisher::ROSPublisher() : nh("~"), diagPub(nh)
     }
     else if(time_source != std::string("ins"))
     {
-        ROS_WARN("This timestamp source is not available. You can use ins or ros. By "
+        RCLCPP_WARN(nh->get_logger(), "This timestamp source is not available. You can use ins or ros. By "
                  "default we replace your value by ins.");
         time_source = std::string("ins");
     }
@@ -31,17 +34,17 @@ ROSPublisher::ROSPublisher() : nh("~"), diagPub(nh)
     }
     else if(time_origin != std::string("unix"))
     {
-        ROS_WARN("This timestamp origin is not available. You can use unix or "
+        RCLCPP_WARN(nh->get_logger(), "This timestamp origin is not available. You can use unix or "
                  "sensor_default. By default we replace your value by unix.");
         time_origin = std::string("unix");
     }
 
     // Check parameters' value
-    ROS_INFO("Frame ID : %s", frame_id.c_str());
-    ROS_INFO("Timestamp register in the header will come from : %s", time_source.c_str());
-    ROS_INFO("Timestamp register in the header will be in the base time of : %s",
+    RCLCPP_INFO(nh->get_logger(), "Frame ID : %s", frame_id.c_str());
+    RCLCPP_INFO(nh->get_logger(), "Timestamp register in the header will come from : %s", time_source.c_str());
+    RCLCPP_INFO(nh->get_logger(), "Timestamp register in the header will be in the base time of : %s",
              time_origin.c_str());
-    ROS_INFO("Use compensated acceleration : %s",
+    RCLCPP_INFO(nh->get_logger(), "Use compensated acceleration : %s",
              use_compensated_acceleration ? "true" : "false");
 
     // Diagnostics
@@ -49,11 +52,10 @@ ROSPublisher::ROSPublisher() : nh("~"), diagPub(nh)
     diagPub.setHardwareID(hardwareName);
 
     // Publishers
-    stdImuPublisher = nh.advertise<sensor_msgs::Imu>("standard/imu", 1);
-    stdNavSatFixPublisher = nh.advertise<sensor_msgs::NavSatFix>("standard/navsatfix", 1);
-    stdTimeReferencePublisher =
-        nh.advertise<sensor_msgs::TimeReference>("standard/timereference", 1);
-    stdInsPublisher = nh.advertise<ixblue_ins_msgs::Ins>("ix/ins", 1);
+    stdImuPublisher = nh->create_publisher<sensor_msgs::msg::Imu>("standard/imu", 1);
+    stdNavSatFixPublisher = nh->create_publisher<sensor_msgs::msg::NavSatFix>("standard/navsatfix", 1);
+    stdTimeReferencePublisher = nh->create_publisher<sensor_msgs::msg::TimeReference>("standard/timereference", 1);
+    stdInsPublisher = nh->create_publisher<ixblue_ins_msgs::msg::Ins>("ix/ins", 1);
 }
 
 void ROSPublisher::onNewStdBinData(
@@ -87,34 +89,34 @@ void ROSPublisher::onNewStdBinData(
         if(timeReferenceMsg)
         {
             timeReferenceMsg->header = headerMsg;
-            stdTimeReferencePublisher.publish(timeReferenceMsg);
+            stdTimeReferencePublisher->publish(*timeReferenceMsg);
         }
     }
 
     if(imuMsg)
     {
         imuMsg->header = headerMsg;
-        stdImuPublisher.publish(imuMsg);
+        stdImuPublisher->publish(*imuMsg);
         diagPub.stdImuTick(imuMsg->header.stamp);
     }
     if(navsatfixMsg)
     {
         navsatfixMsg->header = headerMsg;
-        stdNavSatFixPublisher.publish(navsatfixMsg);
+        stdNavSatFixPublisher->publish(*navsatfixMsg);
     }
     if(iXinsMsg)
     {
         iXinsMsg->header = headerMsg;
-        stdInsPublisher.publish(iXinsMsg);
+        stdInsPublisher->publish(*iXinsMsg);
     }
 }
 
-std_msgs::Header
+std_msgs::msg::Header
 ROSPublisher::getHeader(const ixblue_stdbin_decoder::Data::NavHeader& headerData,
                         const ixblue_stdbin_decoder::Data::BinaryNav& navData)
 {
     // --- Initialisation
-    std_msgs::Header res;
+    std_msgs::msg::Header res;
 
     // --- Frame ID
     res.frame_id = frame_id;
@@ -144,22 +146,22 @@ ROSPublisher::getHeader(const ixblue_stdbin_decoder::Data::NavHeader& headerData
                 (uint32_t)(survey_day_p - unix_origin_p).total_seconds();
 
             // Step 3 : to ROS format
-            res.stamp = ros::Time(stamp_since_origin_sec + sec, nsec);
+            res.stamp = rclcpp::Time(stamp_since_origin_sec + sec, nsec);
         }
         else
         {
-            res.stamp = ros::Time(sec, nsec);
+            res.stamp = rclcpp::Time(sec, nsec);
         }
     }
     else
     {
-        res.stamp = ros::Time::now();
+        res.stamp = nh->get_clock()->now();
     }
 
     return res;
 }
 
-sensor_msgs::ImuPtr
+sensor_msgs::msg::Imu::SharedPtr
 ROSPublisher::toImuMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData,
                        bool use_compensated_acceleration)
 {
@@ -176,7 +178,7 @@ ROSPublisher::toImuMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData,
     }
 
     // --- Initialisation
-    sensor_msgs::ImuPtr res = boost::make_shared<sensor_msgs::Imu>();
+    sensor_msgs::msg::Imu::SharedPtr res = std::make_shared<sensor_msgs::msg::Imu>();
 
     // --- Orientation
     res->orientation.x = navData.attitudeQuaternion.get().q1;
@@ -190,7 +192,7 @@ ROSPublisher::toImuMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData,
     {
         // We don't have the velocity covariance in data, so according to the ROS standard
         // described in msg file we set the whole matrix to 0.
-        res->orientation_covariance.assign(0);
+        res->orientation_covariance = {0, 0, 0, 0, 0, 0, 0, 0, 0};
     }
     else
     {
@@ -221,7 +223,7 @@ ROSPublisher::toImuMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData,
     {
         // We don't have the velocity covariance in data, so according to the ROS standard
         // described in msg file we set the whole matrix to 0.
-        res->angular_velocity_covariance.assign(0);
+        res->angular_velocity_covariance = {0, 0, 0, 0, 0, 0, 0, 0, 0};
     }
     else
     {
@@ -263,7 +265,7 @@ ROSPublisher::toImuMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData,
     {
         // We don't have the velocity covariance in data, so according to the ROS standard
         // described in msg file we set the whole matrix to 0.
-        res->linear_acceleration_covariance.assign(0);
+        res->linear_acceleration_covariance = {0, 0, 0, 0, 0, 0, 0, 0, 0};
     }
     else
     {
@@ -283,7 +285,7 @@ ROSPublisher::toImuMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData,
     return res;
 }
 
-sensor_msgs::NavSatFixPtr
+sensor_msgs::msg::NavSatFix::SharedPtr
 ROSPublisher::toNavSatFixMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData)
 {
 
@@ -294,7 +296,7 @@ ROSPublisher::toNavSatFixMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navDa
     }
 
     // --- Initialisation
-    sensor_msgs::NavSatFixPtr res = boost::make_shared<sensor_msgs::NavSatFix>();
+    sensor_msgs::msg::NavSatFix::SharedPtr res = std::make_shared<sensor_msgs::msg::NavSatFix>();
 
     // --- Position
     res->latitude = navData.position.get().latitude_deg;
@@ -311,7 +313,7 @@ ROSPublisher::toNavSatFixMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navDa
     {
         // We don't have the velocity covariance in data, so according to the ROS standard
         // described in msg file we set the whole matrix to 0.
-        res->position_covariance.assign(0);
+        res->position_covariance = {0, 0, 0, 0, 0, 0, 0, 0, 0};
         res->position_covariance_type = 0;
     }
     else
@@ -336,21 +338,21 @@ ROSPublisher::toNavSatFixMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navDa
     return res;
 }
 
-sensor_msgs::TimeReferencePtr
+sensor_msgs::msg::TimeReference::SharedPtr
 ROSPublisher::toTimeReference(const ixblue_stdbin_decoder::Data::NavHeader& headerData)
 {
     // --- Initialisation
-    sensor_msgs::TimeReferencePtr res = boost::make_shared<sensor_msgs::TimeReference>();
+    sensor_msgs::msg::TimeReference::SharedPtr res = std::make_shared<sensor_msgs::msg::TimeReference>();
 
     // --- System time
-    res->header.stamp = ros::Time::now();
+    res->header.stamp = nh->get_clock()->now();
 
     // --- INS Timestamp
     uint32_t sec = (uint32_t)((headerData.navigationDataValidityTime_100us) / 10000);
     uint32_t nsec =
         (uint32_t)(((headerData.navigationDataValidityTime_100us) % 10000) * 100000);
 
-    res->time_ref = ros::Time(sec, nsec);
+    res->time_ref = rclcpp::Time(sec, nsec);
 
     // --- Frame
     res->source = std::string("ins");
@@ -358,7 +360,7 @@ ROSPublisher::toTimeReference(const ixblue_stdbin_decoder::Data::NavHeader& head
     return res;
 }
 
-ixblue_ins_msgs::InsPtr
+ixblue_ins_msgs::msg::Ins::SharedPtr
 ROSPublisher::toiXInsMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData)
 {
 
@@ -372,7 +374,7 @@ ROSPublisher::toiXInsMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData)
     }
 
     // --- Initialisation
-    ixblue_ins_msgs::InsPtr res = boost::make_shared<ixblue_ins_msgs::Ins>();
+    ixblue_ins_msgs::msg::Ins::SharedPtr res = std::make_shared<ixblue_ins_msgs::msg::Ins>();
 
     // --- Position
     res->latitude = navData.position.get().latitude_deg;
@@ -385,7 +387,7 @@ ROSPublisher::toiXInsMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData)
     {
         // We don't have the velocity covariance in data, so according to the ROS standard
         // described in msg file we set the whole matrix to 0.
-        res->position_covariance.assign(0);
+        res->position_covariance = {0, 0, 0, 0, 0, 0, 0, 0, 0};
     }
     else
     {
@@ -415,7 +417,7 @@ ROSPublisher::toiXInsMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData)
     {
         // We don't have the velocity covariance in data, so according to the ROS standard
         // described in msg file we set the whole matrix to 0.
-        res->attitude_covariance.assign(0);
+        res->attitude_covariance = {0, 0, 0, 0, 0, 0, 0, 0, 0};
     }
     else
     {
@@ -442,7 +444,7 @@ ROSPublisher::toiXInsMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData)
     {
         // We don't have the velocity covariance in data, so according to the ROS standard
         // described in msg file we set the whole matrix to 0.
-        res->speed_vessel_frame_covariance.assign(0);
+        res->speed_vessel_frame_covariance = {0, 0, 0, 0, 0, 0, 0, 0, 0};
     }
     else
     {

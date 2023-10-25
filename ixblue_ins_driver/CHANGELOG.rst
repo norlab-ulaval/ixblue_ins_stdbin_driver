@@ -2,6 +2,10 @@
 Changelog for package ixblue_ins_driver
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.2.0 (2023-10-24)
+------------------
+* Migrated to ROS 2 Humble.
+
 0.1.5 (2020-11-13)
 ------------------
 * Use new std_bin_decoder API to reconstruct incomplete frames

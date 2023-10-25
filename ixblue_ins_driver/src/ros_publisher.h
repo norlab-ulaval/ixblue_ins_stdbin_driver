@@ -1,40 +1,39 @@
 #pragma once
 
-#include <ixblue_ins_msgs/Ins.h>
+#include <ixblue_ins_msgs/msg/ins.hpp>
 #include <ixblue_stdbin_decoder/data_models/nav_header.h>
 #include <ixblue_stdbin_decoder/data_models/stdbin.h>
 
-#include <ros/node_handle.h>
-#include <ros/publisher.h>
-#include <sensor_msgs/Imu.h>
-#include <sensor_msgs/NavSatFix.h>
-#include <sensor_msgs/TimeReference.h>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/imu.hpp>
+#include <sensor_msgs/msg/nav_sat_fix.hpp>
+#include <sensor_msgs/msg/time_reference.hpp>
 
 #include "diagnostics_publisher.h"
 
 class ROSPublisher
 {
 public:
-    ROSPublisher();
+    ROSPublisher(rclcpp::Node::SharedPtr nh);
     void onNewStdBinData(const ixblue_stdbin_decoder::Data::BinaryNav& navData,
                          const ixblue_stdbin_decoder::Data::NavHeader& headerData);
 
     // Standard ros msgs
-    static sensor_msgs::ImuPtr
+    sensor_msgs::msg::Imu::SharedPtr
     toImuMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData,
              bool use_compensated_acceleration);
-    static sensor_msgs::NavSatFixPtr
+    sensor_msgs::msg::NavSatFix::SharedPtr
     toNavSatFixMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData);
-    static sensor_msgs::TimeReferencePtr
+    sensor_msgs::msg::TimeReference::SharedPtr
     toTimeReference(const ixblue_stdbin_decoder::Data::NavHeader& headerData);
 
     // iXblue ros msgs
-    static ixblue_ins_msgs::InsPtr
+    ixblue_ins_msgs::msg::Ins::SharedPtr
     toiXInsMsg(const ixblue_stdbin_decoder::Data::BinaryNav& navData);
 
 protected:
     // Header
-    std_msgs::Header getHeader(const ixblue_stdbin_decoder::Data::NavHeader& headerData,
+    std_msgs::msg::Header getHeader(const ixblue_stdbin_decoder::Data::NavHeader& headerData,
                                const ixblue_stdbin_decoder::Data::BinaryNav& navData);
 
     // Launch parameters
@@ -43,13 +42,13 @@ protected:
     std::string time_origin;
     bool use_compensated_acceleration;
 
-    ros::NodeHandle nh;
+    rclcpp::Node::SharedPtr nh;
 
     // Publishers
-    ros::Publisher stdImuPublisher;
-    ros::Publisher stdNavSatFixPublisher;
-    ros::Publisher stdTimeReferencePublisher;
-    ros::Publisher stdInsPublisher;
+    rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr stdImuPublisher;
+    rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr stdNavSatFixPublisher;
+    rclcpp::Publisher<sensor_msgs::msg::TimeReference>::SharedPtr stdTimeReferencePublisher;
+    rclcpp::Publisher<ixblue_ins_msgs::msg::Ins>::SharedPtr stdInsPublisher;
     DiagnosticsPublisher diagPub;
 
     // Utils

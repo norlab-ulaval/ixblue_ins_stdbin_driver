@@ -7,7 +7,7 @@ class UDPListener : public IPListener
 {
     UDPListener() = delete;
 public:
-    UDPListener(const std::string& ip, uint16_t port);
+    UDPListener(const std::string& ip, uint16_t port, rclcpp::Node::SharedPtr nh);
 
 protected:
     void listenNextData();

@@ -1,29 +1,14 @@
 cmake_minimum_required(VERSION 3.10.2)
 project(ixblue_ins_msgs)
 
-find_package(catkin REQUIRED COMPONENTS
-  geometry_msgs
-  std_msgs
-  message_generation
+find_package(ament_cmake REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/Ins.msg"
+  DEPENDENCIES geometry_msgs std_msgs
 )
 
-## Generate messages in the 'msg' folder
-add_message_files(
-  DIRECTORY msg
-  FILES
-  Ins.msg
-)
-
-## Generate added messages and services with any dependencies listed here
-generate_messages(
-  DEPENDENCIES
-  geometry_msgs
-  std_msgs
-)
-
-###################################
-## catkin specific configuration ##
-###################################
-catkin_package(
-  CATKIN_DEPENDS geometry_msgs std_msgs message_runtime
-)
+ament_package()

@@ -1,27 +1,37 @@
 #include "udp_listener.h"
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
+
+std::string ip;
+int udp_port;
+
+class IxblueInsDriverNode : public rclcpp::Node
+{
+public:
+    IxblueInsDriverNode():
+        Node("ixblue_ins_driver")
+    {
+        this->declare_parameter<int>("udp_port", 8200);
+        this->get_parameter("udp_port", udp_port);
+        this->declare_parameter<std::string>("ip", "0.0.0.0");
+        this->get_parameter("ip", ip);
+        RCLCPP_INFO(this->get_logger(), "UDP port : %d", udp_port);
+        RCLCPP_INFO(this->get_logger(), "IP adress : %s", ip.c_str());
+
+        if(udp_port > std::numeric_limits<uint16_t>::max())
+        {
+            RCLCPP_ERROR_STREAM(this->get_logger(),
+                    "UDP Port can't be greater than : " << std::numeric_limits<uint16_t>::max());
+            rclcpp::shutdown();
+        }
+    }
+};
 
 int main(int argc, char* argv[])
 {
-    ros::init(argc, argv, "ixblue_ins_driver");
-    ros::NodeHandle nh("~");
-
-    std::string ip;
-    int udp_port;
-    nh.param("udp_port", udp_port, 8200);
-    nh.param("ip", ip, std::string("0.0.0.0"));
-    ROS_INFO("UDP port : %d", udp_port);
-    ROS_INFO("IP adress : %s", ip.c_str());
-
-    if(udp_port > std::numeric_limits<uint16_t>::max())
-    {
-        ROS_ERROR_STREAM(
-            "UDP Port can't be greater than : " << std::numeric_limits<uint16_t>::max());
-        return -1;
-    }
-
-    UDPListener udpListener(ip, static_cast<uint16_t>(udp_port));
-
-    ros::spin();
+    rclcpp::init(argc, argv);
+    rclcpp::Node::SharedPtr nh = std::make_shared<IxblueInsDriverNode>();
+    UDPListener udpListener(ip, static_cast<uint16_t>(udp_port), nh);
+    rclcpp::spin(nh);
+    rclcpp::shutdown();
     return 0;
 }
